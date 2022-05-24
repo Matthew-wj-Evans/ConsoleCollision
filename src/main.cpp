@@ -94,9 +94,12 @@ std::wstring GetBinaryString(vector<bool> binary)
     return binaryString;
 }
 
-void WipeAsteroid(Coordinate coords) {
-
-}
+void WipeAsteroid(Coordinate coords, int height, int width) {
+    for (int x = 0; x < width; x++)
+        for (int y = 0; y < height; y++) {
+            fieldPointer[ (y + coords.GetY()) * fieldWidth + (x + coords.GetX())] = 0;
+        }
+}   
 
 void AddAsteroid(Asteroid asteroid)
 {
@@ -237,11 +240,11 @@ int main()
                 }
                 else
                 {
-                    /*
+                    /* 
                         Need to account for the aseroid at the last position
                         being skipped over for movement when a removal occurs.
                     */
-                    WipeAsteroid(vAsteroid[i].coordinate);
+                    WipeAsteroid(vAsteroid[i].coordinate, vAsteroid[i].GetHeight(), vAsteroid[i].GetWidth());
                     vAsteroid.RemoveElement(i);
                     if (i < vAsteroid.size()) {
                         indexMoveQueue.push_back(i); // Capture the inxex of asteroids thats were skipped over
