@@ -20,6 +20,9 @@ public:
     void Reposition(Coordinate);
     void SetX(int);
     void SetY(int);
+// General
+    bool CompareY(Coordinate);
+    bool CompareX(Coordinate);
 };
 
 Coordinate::Coordinate(int x, int y)
@@ -30,7 +33,7 @@ Coordinate::Coordinate(int x, int y)
 
 bool Coordinate::operator==(const Coordinate &coord2) const
 {
-    return ((_y == coord2._y) && (_y == coord2._y));
+    return ((this->_y == coord2._y) && (_x == coord2._x));
 }
 
 int Coordinate::GetX()
@@ -65,5 +68,14 @@ void Coordinate::SetY(int y)
     _y = y;   
 }
 
+bool Coordinate::CompareX(Coordinate coord2)
+{
+    return (this->_x == coord2._x);
+}
+
+bool Coordinate::CompareY(Coordinate coord2)
+{
+    return (this->_y == coord2._y);
+}
 
 #endif
