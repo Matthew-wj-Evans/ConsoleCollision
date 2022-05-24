@@ -9,6 +9,7 @@
 #include <bits/stdc++.h>
 #include <stdio.h>
 #include <Windows.h>
+#include <time.h>
 
 #include "./objects/Asteroid.cpp"
 #include "./objects/Coordinate.cpp"
@@ -34,8 +35,8 @@ int debugHeight = 28,
 int iFieldX = 3,
     iFieldY = 3; // Top left corner
 
-int iFieldBorderX = iFieldX -1,
-    iFieldBorderY = iFieldY -1;
+int iFieldBorderX = iFieldX - 1,
+    iFieldBorderY = iFieldY - 1;
 
 int debugX = (consoleWidth - debugWidth) - 2,
     debugY = 2; // Top Right corner
@@ -94,12 +95,19 @@ std::wstring GetBinaryString(vector<bool> binary)
     return binaryString;
 }
 
-void WipeAsteroid(Coordinate coords, int height, int width) {
+void WipeAsteroid(Coordinate coords, int height, int width)
+{
     for (int x = 0; x < width; x++)
-        for (int y = 0; y < height; y++) {
-            fieldPointer[ (y + coords.GetY()) * fieldWidth + (x + coords.GetX())] = 0;
+        for (int y = 0; y < height; y++)
+        {
+            fieldPointer[(y + coords.GetY()) * fieldWidth + (x + coords.GetX())] = 0;
         }
-}   
+}
+
+bool Compare(Asteroid obj1, Asteroid obj2)
+{
+    return (obj1.coordinate.GetY() < obj2.coordinate.GetY());
+}
 
 void AddAsteroid(Asteroid asteroid)
 {
@@ -150,7 +158,7 @@ void PopulateDebug()
     // Write out data for each asteroid
     for (int y = 0; y < vAsteroid.size(); y++)
     {
-        if (lineNumber < debugHeight)
+        if ((lineNumber + y) < debugHeight)
         {
             int xOffset = 0;
             // Draw out the shapemap
@@ -193,7 +201,7 @@ void SanitizeDebug()
 
 int main()
 {
-    srand(time(0)); // Setting here will set the rand() seed globally.
+    srand(std::time(0)); // Setting here will set the rand() seed globally.
     // (If set in the asteroid class EVERY created asteroid will overwrite the seed, thus requiring a 1 second pause between rand() uses, otherwise the seed will not change.)
 
     fieldPointer = new unsigned char[fieldWidth * fieldHeight];
@@ -232,7 +240,7 @@ int main()
         if (update)
         {
             tickCount = 0;
-            for (int i = 0; i < vAsteroid.size(); i++)
+            for (int i = vAsteroid.size() - 1; i >= 0; i--)
             {
                 if (!AtBoundry(vAsteroid[i]))
                 {
@@ -240,28 +248,27 @@ int main()
                 }
                 else
                 {
-                    /* 
+                    /*
                         Need to account for the aseroid at the last position
                         being skipped over for movement when a removal occurs.
                     */
                     WipeAsteroid(vAsteroid[i].coordinate, vAsteroid[i].GetHeight(), vAsteroid[i].GetWidth());
-                    vAsteroid.RemoveElement(i);
-                    if (i < vAsteroid.size()) {
-                        indexMoveQueue.push_back(i); // Capture the inxex of asteroids thats were skipped over
-                    }
+                    vAsteroid.pop_back();
                     SanitizeDebug();
                     metrics.DeleteInc();
                 }
             };
 
-            while (indexMoveQueue.size()) {
-                    Move(vAsteroid[indexMoveQueue.at(indexMoveQueue.size() - 1)]);
-                    indexMoveQueue.pop_back();
+            while (indexMoveQueue.size())
+            {
+                Move(vAsteroid[indexMoveQueue.at(indexMoveQueue.size() - 1)]);
+                indexMoveQueue.pop_back();
             }
 
             if (!(time % SPAWN_INTERVAL)) // if time is evenly divisible by 5, spawn a rock
             {
                 SpawnAsteroid();
+                std::sort(vAsteroid.begin(), vAsteroid.end(), Compare);
             }
 
             time++;
@@ -271,12 +278,13 @@ int main()
         PopulateDebug();
 
         // Draw Border
-            // Left & Right Borders
-        for (int y = 0; y < fieldHeight + 2; y++) {
+        // Left & Right Borders
+        for (int y = 0; y < fieldHeight + 2; y++)
+        {
             screen[(y + iFieldBorderY) * (consoleWidth) + iFieldBorderX] = L'|';
             screen[(y + iFieldBorderY) * (consoleWidth) + (iFieldBorderX + (fieldWidth + 1))] = L'|';
         }
-            // Top & Bottom Borders
+        // Top & Bottom Borders
         for (int x = 1; x < fieldWidth + 1; x++)
         {
             screen[iFieldBorderY * (consoleWidth) + (iFieldBorderX + x)] = L'=';

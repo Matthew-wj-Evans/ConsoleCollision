@@ -36,7 +36,6 @@ public: // Members
     Coordinate coordinate;
     float _velocity = -1.00f;
     float _rotationalVelocity = 0.00f;
-    
 
 public: // Methods
     Asteroid(int x, int y, int width, int height);
@@ -49,26 +48,15 @@ public: // Methods
     int GetHeight();
     int GetWidth();
     unsigned char GetAsset(int index);
-
 };
 
 // Constructors
-Asteroid::Asteroid(int x, int y, int width, int height) : coordinate(x, y)
+Asteroid::Asteroid(int x, int y, int width, int height) : coordinate(x, y), _width(width), _height(height), _shapeMap(GeneratePattern())
 {
-    coordinate.SetX(x);
-    coordinate.SetY(y);
-    _width = width;
-    _height = height;
-    _shapeMap = GeneratePattern();
 }
 
-Asteroid::Asteroid(int x, int y) : coordinate(x, y)
+Asteroid::Asteroid(int x, int y) : coordinate(x, y), _width(DEFAULT_WIDTH), _height(DEFAULT_HEIGHT), _shapeMap(GeneratePattern())
 {
-    coordinate.SetX(x);
-    coordinate.SetY(y);
-    _width = DEFAULT_WIDTH;
-    _height = DEFAULT_HEIGHT;
-    _shapeMap = GeneratePattern();
 }
 
 // Getters & Setters
@@ -113,7 +101,7 @@ vector<bool> Asteroid::GeneratePattern()
     for (int stack = 0; stack < stackCount; stack++)
     {
         randValue = rand() % (maxValue - minValue) + minValue;
-        toAdd = converter.DecimalToBinary(randValue,  this->_width);
+        toAdd = converter.DecimalToBinary(randValue, this->_width);
         for (int index = 0; index < toAdd.size(); index++)
             shape.push_back(index);
     }

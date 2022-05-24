@@ -28,8 +28,12 @@ public:
     // Element access
     T &back();
     T &operator[](size_type i);
+    typename std::vector<T, std::allocator<T>>::iterator begin();
+    typename std::vector<T, std::allocator<T>>::iterator end();
+
     // Remove element at index
     void RemoveElement(size_type i);
+
 private:
     std::shared_ptr<std::vector<T>> data;
     void check(size_type i, const std::string &msg) const;
@@ -72,19 +76,28 @@ void VecWrapper<T>::pop_back()
     check(0, "pop_back on empty VecWrapper");
     data->pop_back();
 }
-
-
-
 // My code //
 
 template <typename T>
 void VecWrapper<T>::RemoveElement(size_type i)
 {
     check(i, "subscript out of range");
-    T tempType = (*data)[data->size() - ((size_type) 1)];
-    (*data)[data->size() - 1] = (*data)[i];
-    (*data)[i] = tempType;
-    (*data).pop_back();
+    T tempType = (*this).back();
+    (*this).back() = (*this)[i];
+    (*this)[i] = tempType;
+    (*this).pop_back();
+}
+
+template <typename T>
+typename std::vector<T, std::allocator<T>>::iterator VecWrapper<T>::begin()
+{
+    return data->begin();
+}
+
+template <typename T>
+typename std::vector<T, std::allocator<T>>::iterator VecWrapper<T>::end()
+{
+    return data->end();
 }
 
 #endif
