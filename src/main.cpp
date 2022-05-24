@@ -47,6 +47,7 @@ unsigned char *messagePointer = nullptr;
 unsigned char *debugPointer = nullptr;
 
 VecWrapper<Asteroid> vAsteroid;
+std::vector<int> indexMoveQueue;
 
 DebugContainer metrics;
 
@@ -70,12 +71,6 @@ void Move(T &obj)
             }
 
     obj.MoveY(); // Change the Y value
-}
-
-template <typename T>
-bool compareAsteroid(Asteroid a1, Asteroid a2)
-{
-    return (a1.coordinate.GetY() < a2.coordinate.GetY());
 }
 
 // template <typename T>
@@ -242,10 +237,16 @@ int main()
                         being skipped over for movement when a removal occurs.
                     */
                     vAsteroid.RemoveElement(i);
+                    indexMoveQueue.push_back(i); // Capture the inxex of asteroids thats were skipped over
                     SanitizeDebug();
                     metrics.DeleteInc();
                 }
             };
+
+            while (indexMoveQueue.size()) {
+                    Move(vAsteroid[indexMoveQueue.at(indexMoveQueue.size() - 1)]);
+                    indexMoveQueue.pop_back();
+            }
 
             if (!(time % 5)) // if time is evenly divisible by 5, spawn a rock
             {
