@@ -17,6 +17,7 @@
 
 #define ASCII_TILDE L'~'
 #define ASCII_SPACE L' '
+#define SPAWN_INTERVAL 2
 
 // Debugging container
 
@@ -30,8 +31,11 @@ int fieldHeight = 28,
 int debugHeight = 28,
     debugWidth = 75;
 
-int iFieldX = 2,
-    iFieldY = 2; // Top left corner
+int iFieldX = 3,
+    iFieldY = 3; // Top left corner
+
+int iFieldBorderX = iFieldX -1,
+    iFieldBorderY = iFieldY -1;
 
 int debugX = (consoleWidth - debugWidth) - 2,
     debugY = 2; // Top Right corner
@@ -88,6 +92,10 @@ std::wstring GetBinaryString(vector<bool> binary)
         binaryString += binary[index] ? L"1" : L"0";
     }
     return binaryString;
+}
+
+void WipeAsteroid(Coordinate coords) {
+
 }
 
 void AddAsteroid(Asteroid asteroid)
@@ -188,10 +196,7 @@ int main()
     fieldPointer = new unsigned char[fieldWidth * fieldHeight];
     for (int x = 0; x < fieldWidth; x++)
         for (int y = 0; y < fieldHeight; y++)
-            fieldPointer[y * fieldWidth + x] =
-                (x == 0 || x == fieldWidth - 1)    ? 1
-                : (y == 0 || y == fieldHeight - 1) ? 2
-                                                   : 0;
+            fieldPointer[y * fieldWidth + x] = 0;
 
     debugPointer = new unsigned char[debugWidth * debugHeight];
     for (int x = 0; x < debugWidth; x++)
@@ -236,8 +241,11 @@ int main()
                         Need to account for the aseroid at the last position
                         being skipped over for movement when a removal occurs.
                     */
+                    WipeAsteroid(vAsteroid[i].coordinate);
                     vAsteroid.RemoveElement(i);
-                    indexMoveQueue.push_back(i); // Capture the inxex of asteroids thats were skipped over
+                    if (i < vAsteroid.size()) {
+                        indexMoveQueue.push_back(i); // Capture the inxex of asteroids thats were skipped over
+                    }
                     SanitizeDebug();
                     metrics.DeleteInc();
                 }
@@ -248,7 +256,7 @@ int main()
                     indexMoveQueue.pop_back();
             }
 
-            if (!(time % 5)) // if time is evenly divisible by 5, spawn a rock
+            if (!(time % SPAWN_INTERVAL)) // if time is evenly divisible by 5, spawn a rock
             {
                 SpawnAsteroid();
             }
@@ -258,6 +266,19 @@ int main()
 
         // Draw the debug window
         PopulateDebug();
+
+        // Draw Border
+            // Left & Right Borders
+        for (int y = 0; y < fieldHeight + 2; y++) {
+            screen[(y + iFieldBorderY) * (consoleWidth) + iFieldBorderX] = L'|';
+            screen[(y + iFieldBorderY) * (consoleWidth) + (iFieldBorderX + (fieldWidth + 1))] = L'|';
+        }
+            // Top & Bottom Borders
+        for (int x = 1; x < fieldWidth + 1; x++)
+        {
+            screen[iFieldBorderY * (consoleWidth) + (iFieldBorderX + x)] = L'=';
+            screen[(iFieldBorderY + (fieldHeight + 1)) * (consoleWidth) + (iFieldBorderX + x)] = L'=';
+        }
 
         // Draw field
         for (int x = 0; x < fieldWidth; x++)
