@@ -17,6 +17,7 @@ private:
     static const int DEFAULT_HEIGHT = 3;
     static const int MIN_MASS = 3;
     static const int MAX_MASS = 9;
+    static const int START_Y = -3;
 
     // private members
     short int _width;
@@ -51,11 +52,11 @@ public: // Methods
 };
 
 // Constructors
-Asteroid::Asteroid(int x, int y, int width, int height) : coordinate(x, y), _width(width), _height(height), _shapeMap(GeneratePattern())
+Asteroid::Asteroid(int x, int y, int width, int height) : coordinate(x, START_Y), _width(width), _height(height), _shapeMap(GeneratePattern())
 {
 }
 
-Asteroid::Asteroid(int x, int y) : coordinate(x, y), _width(DEFAULT_WIDTH), _height(DEFAULT_HEIGHT), _shapeMap(GeneratePattern())
+Asteroid::Asteroid(int x, int y) : coordinate(x, START_Y), _width(DEFAULT_WIDTH), _height(DEFAULT_HEIGHT), _shapeMap(GeneratePattern())
 {
 }
 

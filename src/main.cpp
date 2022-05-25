@@ -47,12 +47,12 @@ int iTimerX = (fieldWidth / 2) - 2,
     iTimerY = 1; // above field, centered on field X
 
 /* Game Logic/Timer variables */
-int ticks = 1,
+int ticks = 20,
     tickCount = 0;
 int timer = 0;
 int secondTicks = 20,
     secondTicksCount = 0;
-int asteroidSpawnRate = 20;
+int asteroidSpawnRate = 2;
 
 /* Containers */
 unsigned char *fieldPointer = nullptr;
@@ -255,7 +255,7 @@ void PopulateDebug()
         xOffset += stringAddress.size();
         // Add the Y coordinate
         int value = vAsteroid[y].coordinate.GetY();
-        std::wstring coordValue = value < 10 ? L"0" + to_wstring(value) : to_wstring(value);
+        std::wstring coordValue = value < 10 && value >= 0 ? L"0" + to_wstring(value) : to_wstring(value);
         std::wstring coord = L" Y:" + coordValue;
         for (int x = 0; x < coord.size(); x++)
         {
@@ -298,11 +298,14 @@ void AddAsteroid(Asteroid asteroid)
     // Add the Asteroid to the field
     for (int xA = 0; xA < asteroid.GetWidth(); xA++)
         for (int yA = 0; yA < asteroid.GetHeight(); yA++)
-            if (asteroid.GetShapeMap()[(yA * asteroid.GetWidth() + xA)])
+        {
+            int index = (asteroid.coordinate.GetY() + yA) * fieldWidth + (asteroid.coordinate.GetX() + xA);
+            if (asteroid.GetShapeMap()[(yA * asteroid.GetWidth() + xA)] && index >= 1)
             {
                 // Add the current
                 fieldPointer[(asteroid.coordinate.GetY() + yA) * fieldWidth + (asteroid.coordinate.GetX() + xA)] = 3;
             }
+        }
 }
 
 bool Compare(Asteroid obj1, Asteroid obj2)
@@ -312,9 +315,10 @@ bool Compare(Asteroid obj1, Asteroid obj2)
 
 void WipeAsteroid(Coordinate coords, int height, int width)
 {
-    for (int x = 0; x < width; x++)
-        for (int y = 0; y < height; y++)
+    for (int x = 0; x < width && coords.GetX() + width < fieldWidth; x++)
+        for (int y = 0; y < height && coords.GetY() + height < fieldHeight; y++)
         {
+
             fieldPointer[(y + coords.GetY()) * fieldWidth + (x + coords.GetX())] = 0;
         }
 }
@@ -333,7 +337,7 @@ std::wstring GetBinaryString(vector<bool> binary)
 template <typename T>
 bool AtBoundry(T obj)
 {
-    return !(obj.coordinate.GetY() + obj.GetHeight() < fieldHeight - 1);
+    return !(obj.coordinate.GetY() <= fieldHeight);
 }
 
 template <typename T>
@@ -343,11 +347,16 @@ void Move(T &obj)
     // X is decreased first to move from the bottom-right to the top-left
     for (int yA = obj.GetHeight() - 1; yA >= 0; yA--)
         for (int xA = obj.GetWidth() - 1; xA >= 0; xA--)
-            if (obj.GetShapeMap()[(yA * obj.GetWidth() + xA)])
-            {
-                fieldPointer[(obj.coordinate.GetY() + yA) * fieldWidth + (obj.coordinate.GetX() + xA)] = 0;
-                fieldPointer[(obj.coordinate.GetY() + yA) * fieldWidth + (obj.coordinate.GetX() + xA) + fieldWidth] = 3;
+        {
+            if  (yA + obj.coordinate.GetY() < fieldHeight) {
+                int index = (obj.coordinate.GetY() + yA) * fieldWidth + (obj.coordinate.GetX() + xA);
+                if (obj.GetShapeMap()[(yA * obj.GetWidth() + xA)])
+                {
+                    fieldPointer[index] = 0;
+                    fieldPointer[index + fieldWidth] = 3;
+                }
             }
+        }
 
     obj.MoveY(); // Change the Y value
 }
