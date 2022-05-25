@@ -18,17 +18,19 @@
 
 #define ASCII_TILDE L'~'
 #define ASCII_SPACE L' '
-#define SPAWN_INTERVAL 2
+#define SPAWN_INTERVAL 1
 
+/* Buffer widths and heights */
 int consoleHeight = 50,
     consoleWidth = 175;
 
 int fieldHeight = 28,
     fieldWidth = 75;
 
-int debugHeight = 28,
+int debugHeight = 47,
     debugWidth = 75;
 
+/* Buffer positional values */
 int iFieldX = 3,
     iFieldY = 3; // Top left corner
 
@@ -44,173 +46,37 @@ int iMessagesX = fieldWidth + 6,
 int iTimerX = (fieldWidth / 2) - 2,
     iTimerY = 1; // above field, centered on field X
 
-int ticks = 20; // 1 second
-int tickCount = 0;
+/* Game Logic/Timer variables */
+int ticks = 1,
+    tickCount = 0;
 int timer = 0;
+int secondTicks = 20,
+    secondTicksCount = 0;
+int asteroidSpawnRate = 20;
 
+/* Containers */
 unsigned char *fieldPointer = nullptr;
 unsigned char *messagePointer = nullptr;
 unsigned char *debugPointer = nullptr;
-
 VecWrapper<Asteroid> vAsteroid;
 std::vector<int> indexMoveQueue;
 
 DebugContainer metrics;
 
+/* function prototypes */
+std::wstring GetBinaryString(vector<bool> binary);
+void WipeAsteroid(Coordinate coords, int height, int width);
+bool Compare(Asteroid obj1, Asteroid obj2);
+void AddAsteroid(Asteroid asteroid);
+void SpawnAsteroid();
+void PopulateDebug();
+void SanitizeDebug();
 template <typename T>
-bool AtBoundry(T obj)
-{
-    return !(obj.coordinate.GetY() + obj.GetHeight() < fieldHeight - 1);
-}
-
+bool AtBoundry(T obj);
 template <typename T>
-void Move(T &obj)
-{
-    // Starting at the bottom
-    // X is decreased first to move from the bottom-right to the top-left
-    for (int yA = obj.GetHeight() - 1; yA >= 0; yA--)
-        for (int xA = obj.GetWidth() - 1; xA >= 0; xA--)
-            if (obj.GetShapeMap()[(yA * obj.GetWidth() + xA)])
-            {
-                fieldPointer[(obj.coordinate.GetY() + yA) * fieldWidth + (obj.coordinate.GetX() + xA)] = 0;
-                fieldPointer[(obj.coordinate.GetY() + yA) * fieldWidth + (obj.coordinate.GetX() + xA) + fieldWidth] = 3;
-            }
+void Move(T &obj);
 
-    obj.MoveY(); // Change the Y value
-}
-
-// template <typename T>
-// vector<Coordinate> GetCollisionSet(const T &v)
-// {
-
-// }
-
-std::wstring GetBinaryString(vector<bool> binary)
-{
-    std::wstring binaryString = L"";
-
-    for (int index = 0; index < binary.size(); index++)
-    {
-        binaryString += binary[index] ? L"1" : L"0";
-    }
-    return binaryString;
-}
-
-void WipeAsteroid(Coordinate coords, int height, int width)
-{
-    for (int x = 0; x < width; x++)
-        for (int y = 0; y < height; y++)
-        {
-            fieldPointer[(y + coords.GetY()) * fieldWidth + (x + coords.GetX())] = 0;
-        }
-}
-
-bool Compare(Asteroid obj1, Asteroid obj2)
-{
-    return (obj1.coordinate.GetY() < obj2.coordinate.GetY());
-}
-
-void AddAsteroid(Asteroid asteroid)
-{
-
-    vAsteroid.push_back(asteroid);
-    metrics.CreateInc();
-    // Add the Asteroid to the field
-    for (int xA = 0; xA < asteroid.GetWidth(); xA++)
-        for (int yA = 0; yA < asteroid.GetHeight(); yA++)
-            if (asteroid.GetShapeMap()[(yA * asteroid.GetWidth() + xA)])
-            {
-                // Add the current
-                fieldPointer[(asteroid.coordinate.GetY() + yA) * fieldWidth + (asteroid.coordinate.GetX() + xA)] = 3;
-            }
-}
-
-void SpawnAsteroid()
-{
-    int xMax = fieldWidth - 3,
-        xMin = 1,
-        yMax = fieldHeight / 2 - 1,
-        yMin = 1;
-    int xCoord = rand() % (xMax - xMin) + xMin,
-        yCoord = rand() % (yMax - yMin) + yMin;
-    Asteroid toAdd(xCoord, yCoord);
-    AddAsteroid(toAdd);
-    vector<Asteroid> stroids;
-}
-
-void PopulateDebug()
-{
-    /*
-        debugHeight = 28,
-        debugWidth = 75;
-
-    */
-
-    // Header (w34) = Asteroids Created/Destroyed: NN/NN
-    int lineNumber = 1;
-    int rowStart = 2;
-    std::wstring header = L"Asteroids Created/Destroyed: " + std::to_wstring(metrics.GetCreateCount()) + L"\\" + std::to_wstring(metrics.GetDeleteCount());
-    // Write header to line 1
-    for (int index = 0; index < header.size(); index++)
-    {
-        debugPointer[(lineNumber * debugWidth + rowStart + index)] = header[index];
-    }
-    lineNumber++;
-
-    // Write tick speed
-    std::wstring speed = L"Tick Speed: " + std::to_wstring(ticks * 50) + L"ms";
-    for (int index = 0; index < speed.size(); index++)
-    {
-        debugPointer[(lineNumber * debugWidth + rowStart + index)] = speed[index];
-    }
-    lineNumber += 2;
-
-    // Write out data for each asteroid
-    for (int y = 0; y < vAsteroid.size(); y++)
-    {
-        if ((lineNumber + y) < debugHeight)
-        {
-            int xOffset = 0;
-            // Draw out the shapemap
-            for (int x = 0; x < vAsteroid[y].GetShapeMap().size(); x++)
-            {
-                debugPointer[((/* Y */ lineNumber + y) * debugWidth + rowStart + x)] = (vAsteroid[y].GetShapeMap()[x] ? L'1' : L'0');
-            }
-            xOffset += vAsteroid[y].GetShapeMap().size();
-            // Add the address
-            std::wostringstream woStringStream;
-            woStringStream << L" 0x" << &vAsteroid[y];
-            std::wstring stringAddress = woStringStream.str();
-            for (int x = 0; x < stringAddress.size(); x++)
-            {
-                debugPointer[(lineNumber + y) * debugWidth + (rowStart + x + xOffset)] = stringAddress[x];
-            }
-            xOffset += stringAddress.size();
-            // Add the Y coordinate
-            int value = vAsteroid[y].coordinate.GetY();
-            std::wstring coordValue = value < 10 ? L"0" + to_wstring(value) : to_wstring(value);
-            std::wstring coord = L" Y:" + coordValue;
-            for (int x = 0; x < coord.size(); x++)
-            {
-                debugPointer[(lineNumber + y) * debugWidth + (rowStart + x + xOffset)] = coord[x];
-            }
-        }
-    }
-
-} // End PopulateDebug()
-
-void SanitizeDebug()
-{
-    int lineNumber = 2;
-    int rowStart = 1;
-
-    for (int x = rowStart; x < debugWidth - 1; x++)
-        for (int y = lineNumber; y < debugHeight - 1; y++)
-        {
-            debugPointer[y * debugWidth + x] = ' ';
-        }
-}
-
+/* functions */
 int main()
 {
     srand(std::time(0)); // Setting here will set the rand() seed globally.
@@ -243,8 +109,22 @@ int main()
         // Timing
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
         tickCount++;
+        secondTicksCount++;
         bool update = (tickCount == ticks);
+        bool timerUpdate = (secondTicks == secondTicksCount);
 
+        if (timerUpdate)
+        {
+            secondTicksCount = 0;
+            timer++;
+            /*
+                Need to adjust my approach so timer is independent of the adjustable tick rate
+            */
+            if (timer % 5 == 0 && ticks > 1)
+            {
+                ticks -= 1;
+            }
+        }
         if (update)
         {
             tickCount = 0;
@@ -256,10 +136,6 @@ int main()
                 }
                 else
                 {
-                    /*
-                        Need to account for the aseroid at the last position
-                        being skipped over for movement when a removal occurs.
-                    */
                     WipeAsteroid(vAsteroid[i].coordinate, vAsteroid[i].GetHeight(), vAsteroid[i].GetWidth());
                     vAsteroid.pop_back();
                     SanitizeDebug();
@@ -275,17 +151,12 @@ int main()
 
             if (!(timer % SPAWN_INTERVAL)) // if time is evenly divisible by 5, spawn a rock
             {
-                SpawnAsteroid();
+                for (int n = 0; n < asteroidSpawnRate; n++)
+                {
+                    SpawnAsteroid();
+                }
                 std::sort(vAsteroid.begin(), vAsteroid.end(), Compare);
             }
-
-            timer++;
-            /*
-                Need to adjust my approach so timer is independent of the adjustable tick rate
-            */
-            // if (timer % 15 == 0 && ticks > 5) {
-            //     ticks -= 2;
-            // }
         }
 
         // Draw the debug window
@@ -335,4 +206,155 @@ int main()
     }
     return 0;
 }
+
+void PopulateDebug()
+{
+    /*
+        debugHeight = 28,
+        debugWidth = 75;
+
+    */
+
+    // Header (w34) = Asteroids Created/Destroyed: NN/NN
+    int lineNumber = 1;
+    int rowStart = 2;
+    std::wstring header = L"Asteroids Created/Destroyed: " + std::to_wstring(metrics.GetCreateCount()) + L"\\" + std::to_wstring(metrics.GetDeleteCount());
+    // Write header to line 1
+    for (int index = 0; index < header.size(); index++)
+    {
+        debugPointer[(lineNumber * debugWidth + rowStart + index)] = header[index];
+    }
+    lineNumber++;
+
+    // Write tick speed
+    std::wstring speed = L"Tick Speed: " + std::to_wstring(ticks * 50) + L"ms";
+    for (int index = 0; index < speed.size(); index++)
+    {
+        debugPointer[(lineNumber * debugWidth + rowStart + index)] = speed[index];
+    }
+    lineNumber += 2;
+
+    // Write out data for each asteroid
+    for (int y = 0; y < vAsteroid.size() && lineNumber + y < debugHeight - 1; y++)
+    {
+        int xOffset = 0;
+        // Draw out the shapemap
+        for (int x = 0; x < vAsteroid[y].GetShapeMap().size(); x++)
+        {
+            debugPointer[((/* Y */ lineNumber + y) * debugWidth + rowStart + x)] = (vAsteroid[y].GetShapeMap()[x] ? L'1' : L'0');
+        }
+        xOffset += vAsteroid[y].GetShapeMap().size();
+        // Add the address, padding to overrite any leftover characters
+        std::wostringstream woStringStream;
+        woStringStream << L" 0x" << &vAsteroid[y];
+        std::wstring stringAddress = woStringStream.str();
+        for (int x = 0; x < stringAddress.size(); x++)
+        {
+            debugPointer[(lineNumber + y) * debugWidth + (rowStart + x + xOffset)] = stringAddress[x];
+        }
+        xOffset += stringAddress.size();
+        // Add the Y coordinate
+        int value = vAsteroid[y].coordinate.GetY();
+        std::wstring coordValue = value < 10 ? L"0" + to_wstring(value) : to_wstring(value);
+        std::wstring coord = L" Y:" + coordValue;
+        for (int x = 0; x < coord.size(); x++)
+        {
+            debugPointer[(lineNumber + y) * debugWidth + (rowStart + x + xOffset)] = coord[x];
+        }
+    }
+
+} // End PopulateDebug()
+
+void SanitizeDebug()
+{
+    int lineNumber = 2;
+    int rowStart = 1;
+
+    for (int x = rowStart; x < debugWidth - 1; x++)
+        for (int y = lineNumber; y < debugHeight - 1; y++)
+        {
+            debugPointer[y * debugWidth + x] = ' ';
+        }
+}
+
+void SpawnAsteroid()
+{
+    int xMax = fieldWidth - 3,
+        xMin = 1,
+        yMax = fieldHeight / 2 - 1,
+        yMin = 1;
+    int xCoord = rand() % (xMax - xMin) + xMin,
+        yCoord = rand() % (yMax - yMin) + yMin;
+    Asteroid toAdd(xCoord, yCoord);
+    AddAsteroid(toAdd);
+    vector<Asteroid> stroids;
+}
+
+void AddAsteroid(Asteroid asteroid)
+{
+
+    vAsteroid.push_back(asteroid);
+    metrics.CreateInc();
+    // Add the Asteroid to the field
+    for (int xA = 0; xA < asteroid.GetWidth(); xA++)
+        for (int yA = 0; yA < asteroid.GetHeight(); yA++)
+            if (asteroid.GetShapeMap()[(yA * asteroid.GetWidth() + xA)])
+            {
+                // Add the current
+                fieldPointer[(asteroid.coordinate.GetY() + yA) * fieldWidth + (asteroid.coordinate.GetX() + xA)] = 3;
+            }
+}
+
+bool Compare(Asteroid obj1, Asteroid obj2)
+{
+    return (obj1.coordinate.GetY() < obj2.coordinate.GetY());
+}
+
+void WipeAsteroid(Coordinate coords, int height, int width)
+{
+    for (int x = 0; x < width; x++)
+        for (int y = 0; y < height; y++)
+        {
+            fieldPointer[(y + coords.GetY()) * fieldWidth + (x + coords.GetX())] = 0;
+        }
+}
+
+std::wstring GetBinaryString(vector<bool> binary)
+{
+    std::wstring binaryString = L"";
+
+    for (int index = 0; index < binary.size(); index++)
+    {
+        binaryString += binary[index] ? L"1" : L"0";
+    }
+    return binaryString;
+}
+
+template <typename T>
+bool AtBoundry(T obj)
+{
+    return !(obj.coordinate.GetY() + obj.GetHeight() < fieldHeight - 1);
+}
+
+template <typename T>
+void Move(T &obj)
+{
+    // Starting at the bottom
+    // X is decreased first to move from the bottom-right to the top-left
+    for (int yA = obj.GetHeight() - 1; yA >= 0; yA--)
+        for (int xA = obj.GetWidth() - 1; xA >= 0; xA--)
+            if (obj.GetShapeMap()[(yA * obj.GetWidth() + xA)])
+            {
+                fieldPointer[(obj.coordinate.GetY() + yA) * fieldWidth + (obj.coordinate.GetX() + xA)] = 0;
+                fieldPointer[(obj.coordinate.GetY() + yA) * fieldWidth + (obj.coordinate.GetX() + xA) + fieldWidth] = 3;
+            }
+
+    obj.MoveY(); // Change the Y value
+}
+
+// template <typename T>
+// vector<Coordinate> GetCollisionSet(const T &v)
+// {
+
+// }
 #endif
