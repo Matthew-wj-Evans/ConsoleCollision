@@ -20,15 +20,12 @@
 #define ASCII_SPACE L' '
 #define SPAWN_INTERVAL 2
 
-// Debugging container
-
 int consoleHeight = 50,
     consoleWidth = 175;
 
 int fieldHeight = 28,
     fieldWidth = 75;
-// Remaining Width = 175 - 75 = 100
-// Remaining Height = 50 - 28 = 22
+
 int debugHeight = 28,
     debugWidth = 75;
 
@@ -46,6 +43,10 @@ int iMessagesX = fieldWidth + 6,
 
 int iTimerX = (fieldWidth / 2) - 2,
     iTimerY = 1; // above field, centered on field X
+
+int ticks = 20; // 1 second
+int tickCount = 0;
+int timer = 0;
 
 unsigned char *fieldPointer = nullptr;
 unsigned char *messagePointer = nullptr;
@@ -142,6 +143,7 @@ void PopulateDebug()
     /*
         debugHeight = 28,
         debugWidth = 75;
+
     */
 
     // Header (w34) = Asteroids Created/Destroyed: NN/NN
@@ -154,6 +156,14 @@ void PopulateDebug()
         debugPointer[(lineNumber * debugWidth + rowStart + index)] = header[index];
     }
     lineNumber++;
+
+    // Write tick speed
+    std::wstring speed = L"Tick Speed: " + std::to_wstring(ticks * 50) + L"ms";
+    for (int index = 0; index < speed.size(); index++)
+    {
+        debugPointer[(lineNumber * debugWidth + rowStart + index)] = speed[index];
+    }
+    lineNumber += 2;
 
     // Write out data for each asteroid
     for (int y = 0; y < vAsteroid.size(); y++)
@@ -177,7 +187,9 @@ void PopulateDebug()
             }
             xOffset += stringAddress.size();
             // Add the Y coordinate
-            std::wstring coord = L" Y:" + std::to_wstring(vAsteroid[y].coordinate.GetY());
+            int value = vAsteroid[y].coordinate.GetY();
+            std::wstring coordValue = value < 10 ? L"0" + to_wstring(value) : to_wstring(value);
+            std::wstring coord = L" Y:" + coordValue;
             for (int x = 0; x < coord.size(); x++)
             {
                 debugPointer[(lineNumber + y) * debugWidth + (rowStart + x + xOffset)] = coord[x];
@@ -225,10 +237,6 @@ int main()
 
     bool bGamerOver = false;
 
-    int ticks = 20; // 1 second
-    int tickCount = 0;
-    int time = 0;
-
     // Game Loop
     while (!bGamerOver)
     {
@@ -265,13 +273,19 @@ int main()
                 indexMoveQueue.pop_back();
             }
 
-            if (!(time % SPAWN_INTERVAL)) // if time is evenly divisible by 5, spawn a rock
+            if (!(timer % SPAWN_INTERVAL)) // if time is evenly divisible by 5, spawn a rock
             {
                 SpawnAsteroid();
                 std::sort(vAsteroid.begin(), vAsteroid.end(), Compare);
             }
 
-            time++;
+            timer++;
+            /*
+                Need to adjust my approach so timer is independent of the adjustable tick rate
+            */
+            // if (timer % 15 == 0 && ticks > 5) {
+            //     ticks -= 2;
+            // }
         }
 
         // Draw the debug window
@@ -310,7 +324,7 @@ int main()
         }
 
         // Draw Timer
-        swprintf_s(&screen[iTimerY * consoleWidth + iTimerX], 16, L"Time: %d", time);
+        swprintf_s(&screen[iTimerY * consoleWidth + iTimerX], 16, L"Time: %d", timer);
 
         // CMD Buffer variables
         WriteConsoleOutputCharacterW(consoleHandle, screen, consoleWidth * consoleHeight, {
