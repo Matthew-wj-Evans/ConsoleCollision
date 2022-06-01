@@ -17,7 +17,7 @@ private:
     static const int DEFAULT_HEIGHT = 3;
     static const int MIN_MASS = 3;
     static const int MAX_MASS = 9;
-    static const int START_Y = -3;
+    static const int START_Y = -2;
 
     // private members
     short int _width;

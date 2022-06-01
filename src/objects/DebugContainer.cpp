@@ -4,11 +4,11 @@
 class DebugContainer
 {
 private:
-    int _deletionCount,
-        _creationCount;
+    int _deletionCount;
+    int _creationCount;
 
 public:
-    DebugContainer() { _deletionCount = 0, _creationCount = 0; };
+    DebugContainer() : _creationCount(0), _deletionCount(0) {};
     void CreateInc() { _creationCount++; };
     void DeleteInc() { _deletionCount++; };
     int GetCreateCount() { return _creationCount; };

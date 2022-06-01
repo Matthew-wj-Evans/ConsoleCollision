@@ -82,10 +82,15 @@ template <typename T>
 void VecWrapper<T>::RemoveElement(size_type i)
 {
     check(i, "subscript out of range");
-    T tempType = (*this).back();
-    (*this).back() = (*this)[i];
-    (*this)[i] = tempType;
-    (*this).pop_back();
+    if (i == (*data).size() - 1) { 
+        // Is at the end of the vector
+        (*this).pop_back();
+    } else {
+        T tempType = (*data).back();
+        (*data).back() = (*data)[i];
+        (*data)[i] = tempType;
+        (*data).pop_back();
+    }
 }
 
 template <typename T>

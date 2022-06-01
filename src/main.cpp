@@ -11,13 +11,13 @@
 #include <Windows.h>
 #include <time.h>
 
+#include "./objects/Screen.cpp"
 #include "./objects/Asteroid.cpp"
 #include "./objects/Coordinate.cpp"
 #include "./objects/DebugContainer.cpp"
+#include "./objects/DebugLine.cpp"
 #include "./templates/VecWrapper.cpp"
 
-#define ASCII_TILDE L'~'
-#define ASCII_SPACE L' '
 #define SPAWN_INTERVAL 1
 
 /* Buffer widths and heights */
@@ -55,10 +55,11 @@ int secondTicks = 20,
 int asteroidSpawnRate = 2;
 
 /* Containers */
-unsigned char *fieldPointer = nullptr;
-unsigned char *messagePointer = nullptr;
-unsigned char *debugPointer = nullptr;
+Screen fieldScreen = Screen(fieldWidth, fieldHeight);
+Screen debugScreen = Screen(debugWidth, debugHeight);
+Screen consoleScreen = Screen(consoleWidth, consoleHeight);
 VecWrapper<Asteroid> vAsteroid;
+
 std::vector<int> indexMoveQueue;
 
 DebugContainer metrics;
@@ -67,9 +68,9 @@ DebugContainer metrics;
 std::wstring GetBinaryString(vector<bool> binary);
 void WipeAsteroid(Coordinate coords, int height, int width);
 bool Compare(Asteroid obj1, Asteroid obj2);
-void AddAsteroid(Asteroid asteroid);
+void AddAsteroidToField(Asteroid asteroid);
 void SpawnAsteroid();
-void PopulateDebug();
+void PopulateDebug(std::vector<DebugLine> displayLines);
 void SanitizeDebug();
 template <typename T>
 bool AtBoundry(T obj);
@@ -79,24 +80,17 @@ void Move(T &obj);
 /* functions */
 int main()
 {
-    srand(std::time(0)); // Setting here will set the rand() seed globally.
-    // (If set in the asteroid class EVERY created asteroid will overwrite the seed, thus requiring a 1 second pause between rand() uses, otherwise the seed will not change.)
+    std::srand(std::time(0));
 
-    fieldPointer = new unsigned char[fieldWidth * fieldHeight];
-    for (int x = 0; x < fieldWidth; x++)
-        for (int y = 0; y < fieldHeight; y++)
-            fieldPointer[y * fieldWidth + x] = 0;
-
-    debugPointer = new unsigned char[debugWidth * debugHeight];
     for (int x = 0; x < debugWidth; x++)
         for (int y = 0; y < debugHeight; y++)
-            debugPointer[y * debugWidth + x] =
-                ((x == 0) || (y == 0) || (x == (debugWidth - 1)) || (y == (debugHeight - 1))) ? ASCII_TILDE : ASCII_SPACE; // 20 = space, 126 = squiggle
+            debugScreen[y * debugWidth + x] =
+                ((x == 0) || (y == 0) || (x == (debugWidth - 1)) || (y == (debugHeight - 1))) ? L'-' : L' '; // 20 = space, 126 = squiggle
 
     // Create the screen buffer
-    wchar_t *screen = new wchar_t[consoleHeight * consoleWidth];
-    for (int index = 0; index < consoleHeight * consoleWidth; index++)
-        screen[index] = L' ';
+    // wchar_t *screen = new wchar_t[consoleHeight * consoleWidth];
+    // for (int index = 0; index < consoleHeight * consoleWidth; index++)
+    //     screen[index] = L' ';
     HANDLE consoleHandle = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
     SetConsoleActiveScreenBuffer(consoleHandle);
     DWORD bytesWritten = 0;
@@ -137,7 +131,7 @@ int main()
                 else
                 {
                     WipeAsteroid(vAsteroid[i].coordinate, vAsteroid[i].GetHeight(), vAsteroid[i].GetWidth());
-                    vAsteroid.pop_back();
+                    vAsteroid.RemoveElement(i);
                     SanitizeDebug();
                     metrics.DeleteInc();
                 }
@@ -145,7 +139,7 @@ int main()
 
             while (indexMoveQueue.size())
             {
-                Move(vAsteroid[indexMoveQueue.at(indexMoveQueue.size() - 1)]);
+                Move(vAsteroid[indexMoveQueue.back()]);
                 indexMoveQueue.pop_back();
             }
 
@@ -160,20 +154,22 @@ int main()
         }
 
         // Draw the debug window
-        PopulateDebug();
+        std::vector<DebugLine> debugLine;
+        debugLine.push_back(DebugLine(L"Value at screen[0]", std::to_wstring(consoleScreen.GetScreenContent()[2 * consoleWidth + 99])));
+        PopulateDebug(debugLine);
 
         // Draw Border
         // Left & Right Borders
         for (int y = 0; y < fieldHeight + 2; y++)
         {
-            screen[(y + iFieldBorderY) * (consoleWidth) + iFieldBorderX] = L'|';
-            screen[(y + iFieldBorderY) * (consoleWidth) + (iFieldBorderX + (fieldWidth + 1))] = L'|';
+            consoleScreen.Add((y + iFieldBorderY) * (consoleWidth) + iFieldBorderX, L'|');
+            consoleScreen.Add((y + iFieldBorderY) * (consoleWidth) + (iFieldBorderX + (fieldWidth + 1)), L'|');
         }
         // Top & Bottom Borders
         for (int x = 1; x < fieldWidth + 1; x++)
         {
-            screen[iFieldBorderY * (consoleWidth) + (iFieldBorderX + x)] = L'=';
-            screen[(iFieldBorderY + (fieldHeight + 1)) * (consoleWidth) + (iFieldBorderX + x)] = L'=';
+            consoleScreen.Add(iFieldBorderY * (consoleWidth) + (iFieldBorderX + x), L'=');
+            consoleScreen.Add((iFieldBorderY + (fieldHeight + 1)) * (consoleWidth) + (iFieldBorderX + x), L'=');
         }
 
         // Draw field
@@ -181,7 +177,7 @@ int main()
         {
             for (int y = 0; y < fieldHeight; y++)
             {
-                screen[(y + iFieldX) * consoleWidth + (x + iFieldY)] = L" |=0*"[fieldPointer[y * fieldWidth + x]];
+                consoleScreen.Add((y + iFieldY) * consoleWidth + (x + iFieldX), fieldScreen[y * fieldWidth + x]);
             }
         }
 
@@ -190,79 +186,65 @@ int main()
         {
             for (int y = 0; y < debugHeight; y++)
             {
-                screen[(debugY + y) * consoleWidth + (debugX + x)] = debugPointer[y * debugWidth + x];
+                consoleScreen.Add((debugY + y) * consoleWidth + (debugX + x), debugScreen[y * debugWidth + x]);
             }
         }
 
         // Draw Timer
-        swprintf_s(&screen[iTimerY * consoleWidth + iTimerX], 16, L"Time: %d", timer);
-
+        swprintf_s(&consoleScreen[iTimerY * consoleWidth + iTimerX], 16, L"Time: %d", timer);
         // CMD Buffer variables
-        WriteConsoleOutputCharacterW(consoleHandle, screen, consoleWidth * consoleHeight, {
-                                                                                              0,
-                                                                                              0,
-                                                                                          },
+        WriteConsoleOutputCharacterW(consoleHandle, consoleScreen.GetScreenContent().data(), consoleWidth * consoleHeight, {
+                                                                                                                               0,
+                                                                                                                               0,
+                                                                                                                           },
                                      &bytesWritten);
     }
     return 0;
 }
 
-void PopulateDebug()
+void PopulateDebug(std::vector<DebugLine> displayLines)
 {
     /*
         debugHeight = 28,
         debugWidth = 75;
-
     */
-
-    // Header (w34) = Asteroids Created/Destroyed: NN/NN
+    std::vector<std::wstring> lines;
     int lineNumber = 1;
-    int rowStart = 2;
-    std::wstring header = L"Asteroids Created/Destroyed: " + std::to_wstring(metrics.GetCreateCount()) + L"\\" + std::to_wstring(metrics.GetDeleteCount());
-    // Write header to line 1
-    for (int index = 0; index < header.size(); index++)
-    {
-        debugPointer[(lineNumber * debugWidth + rowStart + index)] = header[index];
-    }
+    // Write header
+    lines.push_back(
+        L"Asteroids Created/Destroyed: " + std::to_wstring(metrics.GetCreateCount()) + L"\\" + std::to_wstring(metrics.GetDeleteCount()));
     lineNumber++;
-
     // Write tick speed
-    std::wstring speed = L"Tick Speed: " + std::to_wstring(ticks * 50) + L"ms";
-    for (int index = 0; index < speed.size(); index++)
-    {
-        debugPointer[(lineNumber * debugWidth + rowStart + index)] = speed[index];
-    }
-    lineNumber += 2;
+    lines.push_back(L"Tick Speed: " + std::to_wstring(ticks * 50) + L"ms");
+    lineNumber++;
+    lines.push_back(L" ");
+    // Asteroid Count
+    lines.push_back(L"Asteroid Count: " + std::to_wstring(metrics.GetCreateCount() - metrics.GetDeleteCount()));
+    lineNumber++;
+    lines.push_back(L" ");
+    // Array values
+    int charValue = debugScreen[0];
+    lines.push_back(L"Screen value at Debug[0]: " + std::to_wstring(charValue));
+    lineNumber++;
+    lines.push_back(L" ");
 
-    // Write out data for each asteroid
-    for (int y = 0; y < vAsteroid.size() && lineNumber + y < debugHeight - 1; y++)
+    for (int i = 0; i < displayLines.size() && i + lineNumber < debugHeight; i++)
     {
-        int xOffset = 0;
-        // Draw out the shapemap
-        for (int x = 0; x < vAsteroid[y].GetShapeMap().size(); x++)
-        {
-            debugPointer[((/* Y */ lineNumber + y) * debugWidth + rowStart + x)] = (vAsteroid[y].GetShapeMap()[x] ? L'1' : L'0');
-        }
-        xOffset += vAsteroid[y].GetShapeMap().size();
-        // Add the address, padding to overrite any leftover characters
-        std::wostringstream woStringStream;
-        woStringStream << L" 0x" << &vAsteroid[y];
-        std::wstring stringAddress = woStringStream.str();
-        for (int x = 0; x < stringAddress.size(); x++)
-        {
-            debugPointer[(lineNumber + y) * debugWidth + (rowStart + x + xOffset)] = stringAddress[x];
-        }
-        xOffset += stringAddress.size();
-        // Add the Y coordinate
-        int value = vAsteroid[y].coordinate.GetY();
-        std::wstring coordValue = value < 10 && value >= 0 ? L"0" + to_wstring(value) : to_wstring(value);
-        std::wstring coord = L" Y:" + coordValue;
-        for (int x = 0; x < coord.size(); x++)
-        {
-            debugPointer[(lineNumber + y) * debugWidth + (rowStart + x + xOffset)] = coord[x];
-        }
+        lines.push_back(displayLines[i].Get());
     }
 
+    // Iterate through Lines changing debugPointer
+    for (int y = 0; y < lines.size(); y++)
+    {
+        for (int x = 0; x < lines[y].size(); x++)
+        {
+            if ((int)lines[y][x] == 771)
+            {
+                throw std::out_of_range("kek");
+            }
+            debugScreen[(y + 1) * debugWidth + (x + 1)] = (unsigned char)lines[y][x];
+        }
+    }
 } // End PopulateDebug()
 
 void SanitizeDebug()
@@ -270,11 +252,12 @@ void SanitizeDebug()
     int lineNumber = 2;
     int rowStart = 1;
 
-    for (int x = rowStart; x < debugWidth - 1; x++)
-        for (int y = lineNumber; y < debugHeight - 1; y++)
-        {
-            debugPointer[y * debugWidth + x] = ' ';
-        }
+    for (int x = 1; x < debugWidth - 1; x++)
+        for (int y = 1; y < debugHeight - 1; y++)
+            debugScreen[y * debugWidth + x] = L' ';
+    // {
+    //     debugPointer[y * debugWidth + x] = ' ';
+    // }
 }
 
 void SpawnAsteroid()
@@ -285,16 +268,15 @@ void SpawnAsteroid()
         yMin = 1;
     int xCoord = rand() % (xMax - xMin) + xMin,
         yCoord = rand() % (yMax - yMin) + yMin;
-    Asteroid toAdd(xCoord, yCoord);
-    AddAsteroid(toAdd);
-    vector<Asteroid> stroids;
+    Asteroid asteroid(xCoord, yCoord);
+    vAsteroid.push_back(asteroid);
+
+    metrics.CreateInc();
+    AddAsteroidToField(asteroid);
 }
 
-void AddAsteroid(Asteroid asteroid)
+void AddAsteroidToField(Asteroid asteroid)
 {
-
-    vAsteroid.push_back(asteroid);
-    metrics.CreateInc();
     // Add the Asteroid to the field
     for (int xA = 0; xA < asteroid.GetWidth(); xA++)
         for (int yA = 0; yA < asteroid.GetHeight(); yA++)
@@ -303,7 +285,7 @@ void AddAsteroid(Asteroid asteroid)
             if (asteroid.GetShapeMap()[(yA * asteroid.GetWidth() + xA)] && index >= 1)
             {
                 // Add the current
-                fieldPointer[(asteroid.coordinate.GetY() + yA) * fieldWidth + (asteroid.coordinate.GetX() + xA)] = 3;
+                fieldScreen[(asteroid.coordinate.GetY() + yA) * fieldWidth + (asteroid.coordinate.GetX() + xA)] = L'0';
             }
         }
 }
@@ -316,10 +298,9 @@ bool Compare(Asteroid obj1, Asteroid obj2)
 void WipeAsteroid(Coordinate coords, int height, int width)
 {
     for (int x = 0; x < width && coords.GetX() + width < fieldWidth; x++)
-        for (int y = 0; y < height && coords.GetY() + height < fieldHeight; y++)
+        for (int y = 0; y <= height && coords.GetY() + height <= fieldHeight; y++)
         {
-
-            fieldPointer[(y + coords.GetY()) * fieldWidth + (x + coords.GetX())] = 0;
+            fieldScreen[(y + coords.GetY()) * fieldWidth + (x + coords.GetX())] = L' ';
         }
 }
 
@@ -345,19 +326,27 @@ void Move(T &obj)
 {
     // Starting at the bottom
     // X is decreased first to move from the bottom-right to the top-left
-    for (int yA = obj.GetHeight() - 1; yA >= 0; yA--)
-        for (int xA = obj.GetWidth() - 1; xA >= 0; xA--)
+    for (int yA = 0; yA < obj.GetHeight(); yA++)
+    {
+        for (int xA = 0; xA < obj.GetWidth(); xA++)
         {
-            if  (yA + obj.coordinate.GetY() < fieldHeight) {
-                int index = (obj.coordinate.GetY() + yA) * fieldWidth + (obj.coordinate.GetX() + xA);
-                if (obj.GetShapeMap()[(yA * obj.GetWidth() + xA)])
+            if (obj.coordinate.GetY() < 0)
+            {
+                int index = (yA + obj.coordinate.GetY()) * fieldWidth + (xA + obj.coordinate.GetX());
+                if (index >= 0 && index < fieldScreen.size() && obj.GetShapeMap()[yA * obj.GetWidth() + xA])
                 {
-                    fieldPointer[index] = 0;
-                    fieldPointer[index + fieldWidth] = 3;
+                    fieldScreen.Add(index, L'0');
+                }
+            } else {
+                int index = (yA + obj.coordinate.GetY()) * fieldWidth + (xA + obj.coordinate.GetX());
+                if (index >= 0 && index < fieldScreen.size() && obj.GetShapeMap()[yA * obj.GetWidth() + xA])
+                {
+                    fieldScreen.Add(index, L' ');
+                    fieldScreen.Add(index + fieldWidth, L'0');
                 }
             }
         }
-
+    }
     obj.MoveY(); // Change the Y value
 }
 
